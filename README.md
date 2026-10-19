@@ -1,4 +1,4 @@
-# dsh-bili-notify
+# dsh-bili-to-wechat
 
 把 [dsh-bili-scroll](https://github.com/c1overzz/dsh-bili-scroll) 写出来的日报，**一条一条推到你常用的聊天软件里**。
 
