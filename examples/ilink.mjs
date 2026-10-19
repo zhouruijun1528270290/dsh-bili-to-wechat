@@ -22,6 +22,39 @@ const DRY = process.argv.includes('--dry')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 /**
+ * ⚠️ 这套请求头是**必须**的，少一个就发不出去 —— 而且报错信息会误导你：
+ *
+ *   {"errcode":-14,"errmsg":"session timeout"}
+ *
+ * `-14` 看着像「token 过期了，去重新扫码吧」，其实**多数情况是缺请求头**。
+ * 实测：同一 token、同一 payload，只补上这几个头，就从 -14 变成正常返回 message_id。
+ *
+ *   iLink-App-Id            'bot'
+ *   iLink-App-ClientVersion '1'
+ *   SKRouteTag              '1001'
+ *   X-WECHAT-UIN            base64(uint32 十进制字符串)，每次随机
+ *   AuthorizationType       'ilink_bot_token'
+ *   Authorization           'Bearer <token>'
+ *
+ * 先按 -14 去重新登录，会白扫一次码、还可能把机器人换成新实例。先用这套头排除。
+ */
+function headers() {
+  const uin = Buffer.from(String(Math.floor(Math.random() * 0xffffffff) >>> 0), 'utf8').toString('base64')
+  const h = {
+    'content-type': 'application/json',
+    'iLink-App-Id': 'bot',
+    'iLink-App-ClientVersion': '1',
+    SKRouteTag: '1001',
+    'X-WECHAT-UIN': uin,
+  }
+  if (TOKEN) {
+    h.AuthorizationType = 'ilink_bot_token'
+    h.Authorization = `Bearer ${TOKEN}`
+  }
+  return h
+}
+
+/**
  * 发一条文本。返回响应体（里面有 message_id）。
  *
  * ⚠️ 三条实测出来的硬规矩：
@@ -40,13 +73,13 @@ export async function sendText(text, { contextToken = CONTEXT_TOKEN, toUserId = 
       item_list: [{ type: 1, text_item: { text } }],
       context_token: contextToken,
     },
-    base_info: { channel_version: '0.1.0' },
+    base_info: { channel_version: '1.0.0' },
   }
   if (DRY) return { dry: true, body }
 
   const r = await fetch(`${BASE}/ilink/bot/sendmessage`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}` },
+    headers: headers(),
     body: JSON.stringify(body),
   })
   const json = await r.json().catch(() => ({}))
@@ -75,7 +108,7 @@ export async function sendImage(bytes, { contextToken = CONTEXT_TOKEN, toUserId 
 
   if (DRY) return { dry: true, bytes: bytes.length, ciphertext: ciphertext.length }
 
-  const auth = { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}` }
+  const auth = headers()
   const up = await fetch(`${BASE}/ilink/bot/getuploadurl`, {
     method: 'POST',
     headers: auth,
@@ -88,7 +121,7 @@ export async function sendImage(bytes, { contextToken = CONTEXT_TOKEN, toUserId 
       filesize: padded,
       no_need_thumb: true,
       aeskey: aesKey.toString('hex'),
-      base_info: { channel_version: '0.1.0' },
+      base_info: { channel_version: '1.0.0' },
     }),
   }).then((r) => r.json())
   if (!up?.upload_full_url && !up?.upload_param) throw new Error(`getuploadurl 失败：${JSON.stringify(up)}`)
@@ -125,7 +158,7 @@ export async function sendImage(bytes, { contextToken = CONTEXT_TOKEN, toUserId 
         }],
         context_token: contextToken,
       },
-      base_info: { channel_version: '0.1.0' },
+      base_info: { channel_version: '1.0.0' },
     }),
   }).then((r) => r.json())
   const code = json?.errcode ?? json?.ret

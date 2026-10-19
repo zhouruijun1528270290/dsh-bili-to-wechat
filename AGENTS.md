@@ -97,6 +97,7 @@ B 站公开接口拿封面，不需要登录。**拿不到返回 `null`** ——
 | 标题里出现 `《《…》》` | 标题从正文抓时把书名号也带上了 | 见不变量①；标题只取 `《》` 里的内容 |
 | 消息发出去了但没显示 | 渠道 `message_state` 用了 `GENERATING(1)` | 必须用 `FINISH(2)` |
 | 调用返回成功，但消息没到 | 服务器把错误码放在 `errcode`，只检查 `ret` 会静默失败 | 两个字段都要看：`const code = json?.errcode ?? json?.ret` |
+| 明明刚登录，却报 `-14 session timeout` | **缺 iLink 专用请求头**，不是 token 过期 | 五个头都要带：`iLink-App-Id: bot`、`iLink-App-ClientVersion: 1`、`SKRouteTag: 1001`、`X-WECHAT-UIN: base64(uint32)`、`AuthorizationType: ilink_bot_token`。先补头，别急着重新扫码 |
 | 发图失败 | 消息里的 `aes_key` 写成了 base64(密钥) | 必须是 **base64(密钥的 hex 文本)** |
 | 机器人发不出话 | 没有 `context_token` | 只能等对方先发一条消息；机器人**不能主动建会话** |
 
