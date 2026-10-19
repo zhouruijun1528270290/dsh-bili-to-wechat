@@ -115,15 +115,20 @@ function titleOf(heading, bv, lines) {
   const named = field(lines, ['标题', '视频标题', '名字'])
   if (named) return named
 
-  // 上游更常见的写法是标题在**正文第一行**：`《标题》 · UP · 08:02`。
-  // 只从段首标题抓《》会漏掉这种，退化成「整行当标题」，最后拼出 `《《标题》 · UP · 08:02》`。
-  for (const line of lines) {
-    const inBody = /《([^》]{1,120})》/.exec(line)
-    if (inBody) return inBody[1].trim()
-  }
-
   const rest = clean(heading).replace(bv, '').replace(/^[\s·—\-–|,，:：]+/, '').replace(/[\s·—\-–|,，:：]+$/, '')
   if (rest) return rest
+
+  // 上游更常见的写法是标题在**正文第一行**：`《标题》 · UP · 08:02`。
+  // 只从段首标题抓《》会漏掉这种，退化成「整行当标题」，最后拼出 `《《标题》 · UP · 08:02》`。
+  // 顺序要紧：段首能给出标题时绝不让正文里的《》劫持，所以放在 rest 之后。
+  // 只认**以书名号开头**的正文行（`《标题》 · UP · 08:02`）。
+  // 不能见到《》就抓：`为什么值得：推荐《别的视频》这期` 里的书名号是观感里提到的另一个视频。
+  for (const line of lines) {
+    const v = clean(line)
+    if (!v.startsWith('《')) continue
+    const inBody = /《([^》]{1,120})》/.exec(v)
+    if (inBody) return inBody[1].trim()
+  }
 
   for (const line of lines) {
     const v = clean(line)
