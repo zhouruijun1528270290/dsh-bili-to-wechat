@@ -50,9 +50,12 @@ export async function sendText(text, { contextToken = CONTEXT_TOKEN, toUserId = 
     body: JSON.stringify(body),
   })
   const json = await r.json().catch(() => ({}))
-  if (r.status !== 200 || (json?.ret !== undefined && json.ret !== 0)) {
+  // ⚠️ 这个服务器把错误码放在 errcode 里，只有少数接口用 ret —— 两个都要看。
+  //    只看 ret 的后果：errcode=-14 时 ret 是 undefined，会被当成成功，静默丢消息。
+  const code = json?.errcode ?? json?.ret
+  if (r.status !== 200 || (code !== undefined && code !== 0)) {
     // ⚠️ 常见错误码：-14 = token 过期（要重新登录）；-2 = 被限流，过一会儿再试
-    throw new Error(`sendmessage 失败：HTTP ${r.status} ret=${json?.ret} ${json?.errmsg ?? ''}`)
+    throw new Error(`sendmessage 失败：HTTP ${r.status} code=${code} ${json?.errmsg ?? ''}`)
   }
   return json
 }
@@ -125,6 +128,10 @@ export async function sendImage(bytes, { contextToken = CONTEXT_TOKEN, toUserId 
       base_info: { channel_version: '0.1.0' },
     }),
   }).then((r) => r.json())
+  const code = json?.errcode ?? json?.ret
+  if (code !== undefined && code !== 0) {
+    throw new Error(`sendmessage(图片) 失败：code=${code} ${json?.errmsg ?? ''}`)
+  }
   return json
 }
 
